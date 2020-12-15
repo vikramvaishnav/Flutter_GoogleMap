@@ -26,15 +26,14 @@ class _MapScreenState extends State<MapScreen> {
     _myMapController = controller;
   }
 
-  Future<Set<Polyline>> _createPolylines(
-      List<double> start, List<double> destination) async {
+  _createPolylines(List<double> start, List<double> destination) async {
     // Initializing PolylinePoints
     polylinePoints = PolylinePoints();
 
     // Generating the list of coordinates to be used for
     // drawing the polylines
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      "AIzaSyAXUZJV__NaYwjpvaMjAfZgZ4AqfaG5gww", // Google Maps API Key
+      "AIzaSyD7qRdEvblL4lRE5KQv9X8QxD_Up0ZabBc", // Google Maps API Key
       PointLatLng(start[0], start[1]),
       PointLatLng(destination[0], destination[1]),
       travelMode: TravelMode.transit,
@@ -58,7 +57,7 @@ class _MapScreenState extends State<MapScreen> {
     );
     // Adding the polyline to the map
     polylines[id] = polyline;
-    return polylines.values;
+    // return polylines.values;
   }
 
   void _onNavigateButtonPressed() {}
@@ -81,7 +80,7 @@ class _MapScreenState extends State<MapScreen> {
             draggable: false,
             position: LatLng(mapDataProvider.dest[0], mapDataProvider.dest[1])),
       );
-      
+      _createPolylines(mapDataProvider.src, mapDataProvider.dest);
       return _markers;
     }
 
@@ -97,7 +96,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
               mapToolbarEnabled: false, // To remove direction toolbar
               markers: _addMarkers(),
-              polylines: await _createPolylines(mapDataProvider.src, mapDataProvider.dest),
+              polylines: Set<Polyline>.of(polylines.values),
             ),
             Padding(
               padding: const EdgeInsets.all(14.0),
