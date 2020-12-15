@@ -3,6 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'dart:async';
+
+const double CAMERA_ZOOM = 13;
+const double CAMERA_TILT = 0;
+const double CAMERA_BEARING = 30;
+LatLng SOURCE_LOCATION;
+LatLng DEST_LOCATION;
 
 class MapScreen extends StatefulWidget {
   @override
@@ -10,94 +17,73 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  GoogleMapController _myMapController;
-  final Set<Marker> _markers = {};
+  // List<double> _source;
+  // List<double> _destination ;
+  Completer<GoogleMapController> _controller = Completer();
 
-  // Object for PolylinePoints
-  PolylinePoints polylinePoints;
+// this set will hold my markers
+  Set<Marker> _markers = {};
 
-  // List of coordinates to join
+// this will hold the generated polylines
+
+  Map<PolylineId, Polyline> _polylines = {};
+
+// this will hold each polyline coordinate as Lat and Lng pairs
   List<LatLng> polylineCoordinates = [];
 
-  // Map storing polylines created by connecting two points
-  Map<PolylineId, Polyline> polylines = {};
+// this is the key object - the PolylinePoints
+// which generates every polyline between start and finish
+  PolylinePoints polylinePoints = PolylinePoints();
 
-  void _onMapCreated(GoogleMapController controller) {
-    _myMapController = controller;
+  String googleAPIKey = "AIzaSyD7qRdEvblL4lRE5KQv9X8QxD_Up0ZabBc";
+
+  // for my custom icons
+  BitmapDescriptor sourceIcon;
+  BitmapDescriptor destinationIcon;
+
+  @override
+  void initState() {
+    super.initState();
+    setSourceAndDestinationIcons();
   }
 
-  _createPolylines(List<double> start, List<double> destination) async {
-    // Initializing PolylinePoints
-    polylinePoints = PolylinePoints();
-
-    // Generating the list of coordinates to be used for
-    // drawing the polylines
-    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      "AIzaSyD7qRdEvblL4lRE5KQv9X8QxD_Up0ZabBc", // Google Maps API Key
-      PointLatLng(start[0], start[1]),
-      PointLatLng(destination[0], destination[1]),
-      travelMode: TravelMode.transit,
-    );
-// Adding the coordinates to the list
-    if (result.points.isNotEmpty) {
-      result.points.forEach((PointLatLng point) {
-        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-      });
-    }
-
-    // Defining an ID
-    PolylineId id = PolylineId('poly');
-
-    // Initializing Polyline
-    Polyline polyline = Polyline(
-      polylineId: id,
-      color: Colors.black,
-      points: polylineCoordinates,
-      width: 3,
-    );
-    // Adding the polyline to the map
-    polylines[id] = polyline;
-    // return polylines.values;
+  void setSourceAndDestinationIcons() async {
+    sourceIcon = await BitmapDescriptor.fromAssetImage(
+        ImageConfiguration(devicePixelRatio: 2.5), 'assets/driving_pin.png');
+    destinationIcon = await BitmapDescriptor.fromAssetImage(
+        ImageConfiguration(devicePixelRatio: 2.5),
+        'assets/destination_map_marker.png');
   }
-
-  void _onNavigateButtonPressed() {}
 
   @override
   Widget build(BuildContext context) {
     var mapDataProvider = Provider.of<MapDataProvider>(context);
-    LatLng _center = LatLng(mapDataProvider.src[0], mapDataProvider.src[1]);
 
-    Set<Marker> _addMarkers() {
-      _markers.add(
-        Marker(
-            markerId: MarkerId('Source'),
-            draggable: false,
-            position: LatLng(mapDataProvider.src[0], mapDataProvider.src[1])),
-      );
-      _markers.add(
-        Marker(
-            markerId: MarkerId('Destination'),
-            draggable: false,
-            position: LatLng(mapDataProvider.dest[0], mapDataProvider.dest[1])),
-      );
-      _createPolylines(mapDataProvider.src, mapDataProvider.dest);
-      return _markers;
-    }
+    SOURCE_LOCATION = LatLng(mapDataProvider.src[0], mapDataProvider.src[1]);
+    DEST_LOCATION = LatLng(mapDataProvider.dest[0], mapDataProvider.dest[1]);
+
+    LatLng _center = SOURCE_LOCATION;
+    CameraPosition initialLocation = CameraPosition(
+      zoom: CAMERA_ZOOM,
+      bearing: CAMERA_BEARING,
+      tilt: CAMERA_TILT,
+      target: _center,
+    );
 
     return Scaffold(
         appBar: AppBar(),
         body: Stack(
           children: [
             GoogleMap(
-              onMapCreated: _onMapCreated,
-              initialCameraPosition: CameraPosition(
-                target: _center,
-                zoom: 14.0,
-              ),
-              mapToolbarEnabled: false, // To remove direction toolbar
-              markers: _addMarkers(),
-              polylines: Set<Polyline>.of(polylines.values),
-            ),
+                //myLocationEnabled: true,
+                mapToolbarEnabled: false,
+                compassEnabled: true,
+                tiltGesturesEnabled: false,
+                markers: _markers,
+                polylines: Set<Polyline>.of(_polylines.values),
+                mapType: MapType.normal,
+                initialCameraPosition: initialLocation,
+                onMapCreated: onMapCreated),
             Padding(
               padding: const EdgeInsets.all(14.0),
               child: Align(
@@ -113,4 +99,58 @@ class _MapScreenState extends State<MapScreen> {
           ],
         ));
   }
+
+  void onMapCreated(GoogleMapController controller) {
+    _controller.complete(controller);
+    setMapPins();
+    setPolylines();
+  }
+
+  void setMapPins() {
+    setState(() {
+      // source pin
+      _markers.add(Marker(
+          markerId: MarkerId('sourcePin'),
+          position: SOURCE_LOCATION,
+          icon: sourceIcon));
+      // destination pin
+      _markers.add(Marker(
+          markerId: MarkerId('destPin'),
+          position: DEST_LOCATION,
+          icon: destinationIcon));
+    });
+  }
+
+  setPolylines() async {
+    // Defining an ID
+    PolylineId id = PolylineId('poly');
+
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+        googleAPIKey,
+        PointLatLng(SOURCE_LOCATION.latitude, SOURCE_LOCATION.longitude),
+        PointLatLng(DEST_LOCATION.latitude, DEST_LOCATION.longitude));
+    if (result.points.isNotEmpty) {
+      // loop through all PointLatLng points and convert them
+      // to a list of LatLng, required by the Polyline
+      result.points.forEach((PointLatLng point) {
+        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+      });
+    }
+
+    setState(() {
+      // create a Polyline instance
+      // with an id, an RGB color and the list of LatLng pairs
+      Polyline polyline = Polyline(
+          polylineId: id,
+          color: Color.fromARGB(255, 40, 122, 198),
+          points: polylineCoordinates);
+
+      // add the constructed polyline as a set of points
+      // to the polyline set, which will eventually
+      // end up showing up on the map
+      _polylines[id] = polyline;
+    });
+  }
+
+  void _onNavigateButtonPressed() {}
 }
