@@ -4,21 +4,23 @@ import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'dart:async';
+import 'package:location/location.dart';
 
 const double CAMERA_ZOOM = 13;
 const double CAMERA_TILT = 0;
 const double CAMERA_BEARING = 30;
 LatLng SOURCE_LOCATION;
 LatLng DEST_LOCATION;
+List<double> src;
+List<double> dest;
 
 class MapScreen extends StatefulWidget {
+  MapScreen({Key key, @required src, @required dest}) : super(key: key);
   @override
   _MapScreenState createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
-  // List<double> _source;
-  // List<double> _destination ;
   Completer<GoogleMapController> _controller = Completer();
 
 // this set will hold my markers
@@ -41,10 +43,35 @@ class _MapScreenState extends State<MapScreen> {
   BitmapDescriptor sourceIcon;
   BitmapDescriptor destinationIcon;
 
+  // the user's initial location and current location
+  // as it moves
+  LocationData currentLocation;
+  // a reference to the destination location
+  LocationData destinationLocation;
+  // wrapper around the location API
+  Location location;
+
   @override
   void initState() {
     super.initState();
+
+    // create an instance of Location
+    location = new Location();
+    polylinePoints = PolylinePoints();
+
+    // subscribe to changes in the user's location
+    // by "listening" to the location's onLocationChanged event
+    location.onLocationChanged().listen((LocationData cLoc) {
+      // cLoc contains the lat and long of the
+      // current user's position in real time,
+      // so we're holding on to it
+      currentLocation = cLoc;
+      updatePinOnMap();
+    });
+    // set custom marker pins
     setSourceAndDestinationIcons();
+    // set the initial location
+    setInitialLocation();
   }
 
   void setSourceAndDestinationIcons() async {
@@ -55,14 +82,27 @@ class _MapScreenState extends State<MapScreen> {
         'assets/destination_map_marker.png');
   }
 
+  void setInitialLocation() async {
+    SOURCE_LOCATION = LatLng(src[0], src[1]);
+    DEST_LOCATION = LatLng(dest[0], dest[1]);
+    // set the initial location by pulling the user's
+    // current location from the location's getLocation()
+    currentLocation = LocationData.fromMap({
+      "latitude": SOURCE_LOCATION.latitude,
+      "longitude": SOURCE_LOCATION.longitude
+    });
+
+    // hard-coded destination for this example
+    destinationLocation = LocationData.fromMap({
+      "latitude": DEST_LOCATION.latitude,
+      "longitude": DEST_LOCATION.longitude
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    var mapDataProvider = Provider.of<MapDataProvider>(context);
-
-    SOURCE_LOCATION = LatLng(mapDataProvider.src[0], mapDataProvider.src[1]);
-    DEST_LOCATION = LatLng(mapDataProvider.dest[0], mapDataProvider.dest[1]);
-
     LatLng _center = SOURCE_LOCATION;
+
     CameraPosition initialLocation = CameraPosition(
       zoom: CAMERA_ZOOM,
       bearing: CAMERA_BEARING,
