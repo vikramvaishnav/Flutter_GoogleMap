@@ -13,6 +13,7 @@ LatLng SOURCE_LOCATION;
 LatLng DEST_LOCATION;
 List<double> src;
 List<double> dest;
+PolylineResult result;
 
 class MapScreen extends StatefulWidget {
   MapScreen({Key key, @required src, @required dest}) : super(key: key);
@@ -103,12 +104,19 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     LatLng _center = SOURCE_LOCATION;
 
-    CameraPosition initialLocation = CameraPosition(
+    CameraPosition initialCameraPosition = CameraPosition(
       zoom: CAMERA_ZOOM,
       bearing: CAMERA_BEARING,
       tilt: CAMERA_TILT,
       target: _center,
     );
+    if (currentLocation != null) {
+      initialCameraPosition = CameraPosition(
+          target: LatLng(currentLocation.latitude, currentLocation.longitude),
+          zoom: CAMERA_ZOOM,
+          tilt: CAMERA_TILT,
+          bearing: CAMERA_BEARING);
+    }
 
     return Scaffold(
         appBar: AppBar(),
@@ -122,8 +130,13 @@ class _MapScreenState extends State<MapScreen> {
                 markers: _markers,
                 polylines: Set<Polyline>.of(_polylines.values),
                 mapType: MapType.normal,
-                initialCameraPosition: initialLocation,
-                onMapCreated: onMapCreated),
+                initialCameraPosition: initialCameraPosition,
+                onMapCreated: (GoogleMapController controller) {
+                  _controller.complete(controller);
+                  // my map has completed being created;
+                  // i'm ready to show the pins on the map
+                  showPinsOnMap();
+                }),
             Padding(
               padding: const EdgeInsets.all(14.0),
               child: Align(
@@ -140,32 +153,34 @@ class _MapScreenState extends State<MapScreen> {
         ));
   }
 
-  void onMapCreated(GoogleMapController controller) {
-    _controller.complete(controller);
-    setMapPins();
+  void showPinsOnMap() {
+    // get a LatLng for the source location
+    // from the LocationData currentLocation object
+    var pinPosition =
+        LatLng(currentLocation.latitude, currentLocation.longitude);
+    // get a LatLng out of the LocationData object
+    var destPosition =
+        LatLng(destinationLocation.latitude, destinationLocation.longitude);
+    // add the initial source location pin
+    _markers.add(Marker(
+        markerId: MarkerId('sourcePin'),
+        position: pinPosition,
+        icon: sourceIcon));
+    // destination pin
+    _markers.add(Marker(
+        markerId: MarkerId('destPin'),
+        position: destPosition,
+        icon: destinationIcon));
+    // set the route lines on the map from source to destination
+    // for more info follow this tutorial
     setPolylines();
-  }
-
-  void setMapPins() {
-    setState(() {
-      // source pin
-      _markers.add(Marker(
-          markerId: MarkerId('sourcePin'),
-          position: SOURCE_LOCATION,
-          icon: sourceIcon));
-      // destination pin
-      _markers.add(Marker(
-          markerId: MarkerId('destPin'),
-          position: DEST_LOCATION,
-          icon: destinationIcon));
-    });
   }
 
   setPolylines() async {
     // Defining an ID
     PolylineId id = PolylineId('poly');
 
-    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+    result = await polylinePoints.getRouteBetweenCoordinates(
         googleAPIKey,
         PointLatLng(SOURCE_LOCATION.latitude, SOURCE_LOCATION.longitude),
         PointLatLng(DEST_LOCATION.latitude, DEST_LOCATION.longitude));
@@ -196,5 +211,41 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _onNavigateButtonPressed() {}
+  void updatePinOnMap() async {
+    // create a new CameraPosition instance
+    // every time the location changes, so the camera
+    // follows the pin as it moves with an animation
+    CameraPosition cPosition = CameraPosition(
+      zoom: CAMERA_ZOOM,
+      tilt: CAMERA_TILT,
+      bearing: CAMERA_BEARING,
+      target: LatLng(currentLocation.latitude, currentLocation.longitude),
+    );
+    final GoogleMapController controller = await _controller.future;
+    controller.animateCamera(CameraUpdate.newCameraPosition(cPosition));
+    // do this inside the setState() so Flutter gets notified
+    // that a widget update is due
+    setState(() {
+      // updated position
+      var pinPosition =
+          LatLng(currentLocation.latitude, currentLocation.longitude);
+
+      // the trick is to remove the marker (by id)
+      // and add it again at the updated location
+      _markers.removeWhere((m) => m.markerId.value == 'sourcePin');
+      _markers.add(Marker(
+          markerId: MarkerId('sourcePin'),
+          position: pinPosition, // updated position
+          icon: sourceIcon));
+    });
+  }
+
+  void _onNavigateButtonPressed() {
+    result.points.forEach((PointLatLng point) {
+      Timer(Duration(seconds: 3), () {
+        currentLocation = LocationData.fromMap(
+            {"latitude": point.latitude, "longitude": point.longitude});
+      });
+    });
+  }
 }
