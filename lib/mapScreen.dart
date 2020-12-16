@@ -35,7 +35,7 @@ class _MapScreenState extends State<MapScreen> {
 // which generates every polyline between start and finish
   PolylinePoints polylinePoints = PolylinePoints();
 
-  String googleAPIKey = "AIzaSyD7qRdEvblL4lRE5KQv9X8QxD_Up0ZabBc";
+  String googleAPIKey = "AIzaSyAXUZJV__NaYwjpvaMjAfZgZ4AqfaG5gww";
 
   // for my custom icons
   BitmapDescriptor sourceIcon;
@@ -130,11 +130,14 @@ class _MapScreenState extends State<MapScreen> {
         PointLatLng(SOURCE_LOCATION.latitude, SOURCE_LOCATION.longitude),
         PointLatLng(DEST_LOCATION.latitude, DEST_LOCATION.longitude));
     if (result.points.isNotEmpty) {
+      print("Result : $result");
       // loop through all PointLatLng points and convert them
       // to a list of LatLng, required by the Polyline
       result.points.forEach((PointLatLng point) {
         polylineCoordinates.add(LatLng(point.latitude, point.longitude));
       });
+    } else {
+      print("Null result : Something went wrong $result");
     }
 
     setState(() {
@@ -142,7 +145,8 @@ class _MapScreenState extends State<MapScreen> {
       // with an id, an RGB color and the list of LatLng pairs
       Polyline polyline = Polyline(
           polylineId: id,
-          color: Color.fromARGB(255, 40, 122, 198),
+          color: Colors.black,
+          width: 5,
           points: polylineCoordinates);
 
       // add the constructed polyline as a set of points
