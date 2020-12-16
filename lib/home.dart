@@ -1,4 +1,4 @@
-import 'package:eatoz_map/mapScreen.dart';
+import 'package:eatoz_map/mapScreen copy.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:eatoz_map/provider/map_data_provider.dart';

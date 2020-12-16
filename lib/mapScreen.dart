@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'dart:async';
-import 'package:location/location.dart';
 
 const double CAMERA_ZOOM = 13;
 const double CAMERA_TILT = 0;
@@ -51,29 +50,20 @@ class _MapScreenState extends State<MapScreen> {
 
   // the user's initial location and current location
   // as it moves
-  LocationData currentLocation;
+  LatLng currentLocation;
   // a reference to the destination location
-  LocationData destinationLocation;
-  // wrapper around the location API
-  Location location;
+  LatLng destinationLocation;
 
   @override
   void initState() {
     super.initState();
 
     // create an instance of Location
-    location = new Location();
     polylinePoints = PolylinePoints();
 
     // subscribe to changes in the user's location
     // by "listening" to the location's onLocationChanged event
-    location.onLocationChanged.listen((LocationData cLoc) {
-      // cLoc contains the lat and long of the
-      // current user's position in real time,
-      // so we're holding on to it
-      currentLocation = cLoc;
-      updatePinOnMap();
-    });
+
     // set custom marker pins
     setSourceAndDestinationIcons();
     // set the initial location
@@ -93,16 +83,10 @@ class _MapScreenState extends State<MapScreen> {
     DEST_LOCATION = LatLng(dest[0], dest[1]);
     // set the initial location by pulling the user's
     // current location from the location's getLocation()
-    currentLocation = LocationData.fromMap({
-      "latitude": SOURCE_LOCATION.latitude,
-      "longitude": SOURCE_LOCATION.longitude
-    });
+    currentLocation = SOURCE_LOCATION;
 
     // hard-coded destination for this example
-    destinationLocation = LocationData.fromMap({
-      "latitude": DEST_LOCATION.latitude,
-      "longitude": DEST_LOCATION.longitude
-    });
+    destinationLocation = DEST_LOCATION;
   }
 
   @override
@@ -216,7 +200,7 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void updatePinOnMap() async {
+  Future<void> updatePinOnMap(LatLng newLoc) async {
     // create a new CameraPosition instance
     // every time the location changes, so the camera
     // follows the pin as it moves with an animation
@@ -224,7 +208,7 @@ class _MapScreenState extends State<MapScreen> {
       zoom: CAMERA_ZOOM,
       tilt: CAMERA_TILT,
       bearing: CAMERA_BEARING,
-      target: LatLng(currentLocation.latitude, currentLocation.longitude),
+      target: newLoc,
     );
     final GoogleMapController controller = await _controller.future;
     controller.animateCamera(CameraUpdate.newCameraPosition(cPosition));
@@ -232,8 +216,9 @@ class _MapScreenState extends State<MapScreen> {
     // that a widget update is due
     setState(() {
       // updated position
-      var pinPosition =
-          LatLng(currentLocation.latitude, currentLocation.longitude);
+      var pinPosition = newLoc;
+
+      print("pinPos $pinPosition");
 
       // the trick is to remove the marker (by id)
       // and add it again at the updated location
@@ -247,11 +232,11 @@ class _MapScreenState extends State<MapScreen> {
 
   void _onNavigateButtonPressed() {
     int counter = 0;
-    result.points.forEach((PointLatLng point) {
-      Timer(Duration(microseconds: 10), () {
-        currentLocation = LocationData.fromMap(
-            {"latitude": point.latitude, "longitude": point.longitude});
+    result.points.forEach((PointLatLng point) async {
+      await Timer(Duration(seconds: 3), () async {
+        currentLocation = LatLng(point.latitude, point.longitude);
         print("Pin moved ${counter++}");
+        await updatePinOnMap(currentLocation);
       });
     });
   }
