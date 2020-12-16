@@ -11,12 +11,17 @@ const double CAMERA_TILT = 0;
 const double CAMERA_BEARING = 30;
 LatLng SOURCE_LOCATION;
 LatLng DEST_LOCATION;
+Set<List<double>> set;
 List<double> src;
 List<double> dest;
 PolylineResult result;
 
 class MapScreen extends StatefulWidget {
-  MapScreen({Key key, @required src, @required dest}) : super(key: key);
+  MapScreen(Set<List<double>> inSet) {
+    set = inSet;
+    src = set.elementAt(0);
+    dest = set.elementAt(1);
+  }
   @override
   _MapScreenState createState() => _MapScreenState();
 }
@@ -62,7 +67,7 @@ class _MapScreenState extends State<MapScreen> {
 
     // subscribe to changes in the user's location
     // by "listening" to the location's onLocationChanged event
-    location.onLocationChanged().listen((LocationData cLoc) {
+    location.onLocationChanged.listen((LocationData cLoc) {
       // cLoc contains the lat and long of the
       // current user's position in real time,
       // so we're holding on to it
@@ -241,10 +246,12 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onNavigateButtonPressed() {
+    int counter = 0;
     result.points.forEach((PointLatLng point) {
-      Timer(Duration(seconds: 3), () {
+      Timer(Duration(microseconds: 10), () {
         currentLocation = LocationData.fromMap(
             {"latitude": point.latitude, "longitude": point.longitude});
+        print("Pin moved ${counter++}");
       });
     });
   }

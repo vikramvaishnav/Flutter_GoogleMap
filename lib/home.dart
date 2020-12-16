@@ -106,8 +106,9 @@ class _HomeState extends State<Home> {
                     ]);
 
                     // getPermis();
-                    Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => MapScreen()));
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => MapScreen(
+                            {mapDataProvider.src, mapDataProvider.dest})));
                   },
                 )
               ],
